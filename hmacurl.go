@@ -6,16 +6,16 @@ import (
 	"./signature"
 	"./utilities"
 	"./validation"
+	"bytes"
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/url"
-  "net/http"
 	"os"
 	"strings"
 	"time"
-  "bytes"
 )
 
 // positional argument
@@ -35,13 +35,13 @@ var opts struct {
 
 	CurlOnly bool `long:"curl-only" default:"false" description:"If specified, will only print out a curl command - not actually run a request"`
 
-  AccessKey string `short:"a" long:"access-key" default:"" description:"The access Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_ACCESS_KEY='fasdf')"`
+	AccessKey string `short:"a" long:"access-key" default:"" description:"The access Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_ACCESS_KEY='fasdf')"`
 
-  SecretKey string `short:"s" long:"secret-key" default:"" description:"The secret Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_SECRET_KEY='fasdf')"`
+	SecretKey string `short:"s" long:"secret-key" default:"" description:"The secret Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_SECRET_KEY='fasdf')"`
 
-  Debug bool `long:"debug" default:"false" description:"Whether to output debug information"`
+	Debug bool `long:"debug" default:"false" description:"Whether to output debug information"`
 
-  // remaining positional args
+	// remaining positional args
 	Args Url `positional-args:"true" required:"true"`
 }
 
@@ -56,31 +56,30 @@ func init() {
 
 func main() {
 
-  var accessKey string
-  var secretKey string
+	var accessKey string
+	var secretKey string
 
-  // if we werent provided these arguments, pull from environment
-  if opts.AccessKey == "" {
-    if os.Getenv("HMACURL_ACCESS_KEY") == "" {
-      fmt.Println("Please provide access key via argument or environment variable HMACURL_ACCESS_KEY")
-      os.Exit(3)
-    } else {
-      accessKey = os.Getenv("HMACURL_ACCESS_KEY")
-    }
-  } else {
-    accessKey = opts.AccessKey
-  }
-  if opts.SecretKey == "" {
-    if os.Getenv("HMACURL_SECRET_KEY") == "" {
-      fmt.Println("Please provide secret key via argument or environment variable HMACURL_SECRET_KEY")
-      os.Exit(3)
-    } else {
-      secretKey = os.Getenv("HMACURL_SECRET_KEY")
-    }
-  } else {
-    secretKey = opts.SecretKey
-  }
-
+	// if we werent provided these arguments, pull from environment
+	if opts.AccessKey == "" {
+		if os.Getenv("HMACURL_ACCESS_KEY") == "" {
+			fmt.Println("Please provide access key via argument or environment variable HMACURL_ACCESS_KEY")
+			os.Exit(3)
+		} else {
+			accessKey = os.Getenv("HMACURL_ACCESS_KEY")
+		}
+	} else {
+		accessKey = opts.AccessKey
+	}
+	if opts.SecretKey == "" {
+		if os.Getenv("HMACURL_SECRET_KEY") == "" {
+			fmt.Println("Please provide secret key via argument or environment variable HMACURL_SECRET_KEY")
+			os.Exit(3)
+		} else {
+			secretKey = os.Getenv("HMACURL_SECRET_KEY")
+		}
+	} else {
+		secretKey = opts.SecretKey
+	}
 
 	if validation.Method(opts.Request) == false {
 		fmt.Printf("method %s is invalid\n", opts.Request)
@@ -119,7 +118,7 @@ func main() {
 	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z")}
 
 	// add headers passed in from -H options to headerMap
-	for k,v := range opts.Headers {
+	for k, v := range opts.Headers {
 		headerMap[strings.ToLower(k)] = strings.ToLower(v)
 	}
 
@@ -161,48 +160,48 @@ func main() {
 	// if we had a flag to only output the curl command, dump that and be done
 	if opts.CurlOnly == true {
 		headerStringBuild := ""
-		for k,v := range headerMap {
+		for k, v := range headerMap {
 			headerStringBuild += fmt.Sprintf(" %s '%s:%s'", "-H", k, v)
-    }
-    if opts.Request == "POST" {
-		    fmt.Printf("curl -X%s %s %s -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
-    } else if opts.Request == "GET" {
-      fmt.Printf("curl -X%s %s %s -v", opts.Request, headerStringBuild, urlString)
-    }
+		}
+		if opts.Request == "POST" {
+			fmt.Printf("curl -X%s %s %s -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
+		} else if opts.Request == "GET" {
+			fmt.Printf("curl -X%s %s %s -v", opts.Request, headerStringBuild, urlString)
+		}
 		fmt.Println()
-    os.Exit(0)
+		os.Exit(0)
 	}
 
 	// make either a GET Request or POST Request
-  if opts.Request == "GET" {
-    client := &http.Client{}
-    req, err := http.NewRequest("GET", urlString.String(), nil)
-    // add headers to request
-    for k,v := range headerMap {
-      req.Header.Add(k,v)
-    }
-    resp, err := client.Do(req)
-    if err != nil {
-	     fmt.Println("error in http call")
-       os.Exit(4)
-    }
-    defer resp.Body.Close()
-    body, err := ioutil.ReadAll(resp.Body)
-    fmt.Println(string(body[:]))
-  } else if opts.Request == "POST" {
-    client := &http.Client{}
-    req, err := http.NewRequest("POST", urlString.String(), bytes.NewBufferString(payload))
-    // add headers to request
-    for k,v := range headerMap {
-      req.Header.Add(k,v)
-    }
-    resp, err := client.Do(req)
-    if err != nil {
-	     fmt.Println("error in http call")
-       os.Exit(4)
-    }
-    defer resp.Body.Close()
-    body, err := ioutil.ReadAll(resp.Body)
-    fmt.Println(string(body[:]))
-  }
+	if opts.Request == "GET" {
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", urlString.String(), nil)
+		// add headers to request
+		for k, v := range headerMap {
+			req.Header.Add(k, v)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("error in http call")
+			os.Exit(4)
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(body[:]))
+	} else if opts.Request == "POST" {
+		client := &http.Client{}
+		req, err := http.NewRequest("POST", urlString.String(), bytes.NewBufferString(payload))
+		// add headers to request
+		for k, v := range headerMap {
+			req.Header.Add(k, v)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("error in http call")
+			os.Exit(4)
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(body[:]))
+	}
 }
