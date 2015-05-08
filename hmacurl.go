@@ -18,10 +18,12 @@ import (
   "bytes"
 )
 
+// positional argument
 type Url struct {
 	Url string `positional-arg-name:"url"`
 }
 
+// setup flags
 var opts struct {
 	Request string `short:"X" long:"request" default:"GET" description:"the http method to use" value-name:"GET|POST"`
 
@@ -43,6 +45,7 @@ var opts struct {
 	Args Url `positional-args:"true" required:"true"`
 }
 
+// will run before main() used to parse our flags
 func init() {
 	_, err := flags.Parse(&opts)
 	// help call
@@ -105,10 +108,17 @@ func main() {
 		}
 	}
 	requestTime := time.Now().UTC()
-	host, _, _ := net.SplitHostPort(urlString.Host)
-	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z"), "host" : host}
+	host, _, err := net.SplitHostPort(urlString.Host)
+	// likely no port
+	if err != nil {
+		host = urlString.Host
+	}
+	hostShort := strings.Split(host, ".")[0]
 
-	// add headers to headerMap
+	// setup headers
+	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z")}
+
+	// add headers passed in from -H options to headerMap
 	for k,v := range opts.Headers {
 		headerMap[strings.ToLower(k)] = strings.ToLower(v)
 	}
@@ -118,6 +128,7 @@ func main() {
 		headerMap["content-type"] = "application/octet-stream"
 	}
 
+	// where we start the signing process - pass in http method, url, headers and payload. for GET requests payload should be ""
 	canonicalString := canonicalRequest.FormatCanonicalString(opts.Request, urlString, headerMap, payload)
 	if opts.Debug == true {
 		fmt.Println("Canonical String:")
@@ -130,21 +141,24 @@ func main() {
 		fmt.Println(canonicalStringHashed)
 		fmt.Println("================")
 	}
-	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, host)
+	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, hostShort)
 	if opts.Debug == true {
 		fmt.Println("String to sign:")
 		fmt.Println(stringToSign)
 		fmt.Println("================")
 	}
 
-	signature := signature.CalculateSignature(requestTime, stringToSign, host, secretKey)
-	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, host, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
+	signature := signature.CalculateSignature(requestTime, stringToSign, hostShort, secretKey)
+	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, hostShort, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
 	if opts.Debug == true {
 		fmt.Println("signature:")
 		fmt.Println(headerMap["Authorization"])
 		fmt.Println("================")
 	}
 
+	// signing process is complete start http calls
+
+	// if we had a flag to only output the curl command, dump that and be done
 	if opts.CurlOnly == true {
 		headerStringBuild := ""
 		for k,v := range headerMap {
@@ -158,7 +172,8 @@ func main() {
 		fmt.Println()
     os.Exit(0)
 	}
-	fmt.Println(headerMap)
+
+	// make either a GET Request or POST Request
   if opts.Request == "GET" {
     client := &http.Client{}
     req, err := http.NewRequest("GET", urlString.String(), nil)
