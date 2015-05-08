@@ -1,5 +1,5 @@
 # hmacurl
-hmacurl is a curl inspired command line utility that implements aws4 hmac signing for request
+`hmacurl` is a curl inspired command line utility that implements aws4 hmac signing for request
 
 <img width="10%" src="https://raw.github.com/golang-samples/gopher-vector/master/gopher.png"/>
 
