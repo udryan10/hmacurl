@@ -110,7 +110,6 @@ func main() {
   layout := "2006-01-02T15:04:05.000Z"
   str := "2015-05-10T13:45:26.000Z"
   requestTime, err := time.Parse(layout, str)
-  fmt.Println(requestTime)
 	//requestTime := time.Now().UTC()
 
 	host, _, err := net.SplitHostPort(urlString.Host)
