@@ -1,11 +1,11 @@
 package main
 
 import (
-	"./canonicalRequest"
-	"./signString"
-	"./signature"
-	"./utilities"
-	"./validation"
+	"github.com/udryan10/hmacurl/canonicalRequest"
+	"github.com/udryan10/hmacurl/signString"
+	"github.com/udryan10/hmacurl/signature"
+	"github.com/udryan10/hmacurl/utilities"
+	"github.com/udryan10/hmacurl/validation"
 	"bytes"
 	"fmt"
 	"github.com/jessevdk/go-flags"
