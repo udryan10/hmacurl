@@ -5,7 +5,7 @@ import (
   "net/url"
   "strings"
   "fmt"
-  "../utilities"
+  "github.com/udryan10/hmacurl/utilities"
   )
 
 
