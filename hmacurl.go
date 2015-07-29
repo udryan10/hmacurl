@@ -39,6 +39,10 @@ var opts struct {
 
 	SecretKey string `short:"s" long:"secret-key" default:"" description:"The secret Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_SECRET_KEY='fasdf')"`
 
+	CredentialScope string `short:"c" long:"credential-scope" default:"" description:"The credential scope (aka Service Name) for the request. Defaults to short host name."`
+
+	SkipHost bool `short:"" long:"skip-host" default:"false" description:"Do not sign the Host header (useful for non-standard HMAC implementations)"`
+
 	Debug bool `long:"debug" default:"false" description:"Whether to output debug information"`
 
 	// remaining positional args
@@ -112,10 +116,18 @@ func main() {
 	if err != nil {
 		host = urlString.Host
 	}
-	hostShort := strings.Split(host, ".")[0]
+
+	credentialScope := opts.CredentialScope
+	if opts.CredentialScope == "" {
+		credentialScope = strings.Split(host, ".")[0]
+	}
 
 	// setup headers
 	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z")}
+
+	if opts.SkipHost == false {
+		headerMap["host"] = host
+	}
 
 	// add headers passed in from -H options to headerMap
 	for k, v := range opts.Headers {
@@ -140,15 +152,15 @@ func main() {
 		fmt.Println(canonicalStringHashed)
 		fmt.Println("================")
 	}
-	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, hostShort)
+	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, credentialScope)
 	if opts.Debug == true {
 		fmt.Println("String to sign:")
 		fmt.Println(stringToSign)
 		fmt.Println("================")
 	}
 
-	signature := signature.CalculateSignature(requestTime, stringToSign, hostShort, secretKey)
-	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, hostShort, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
+	signature := signature.CalculateSignature(requestTime, stringToSign, credentialScope, secretKey)
+	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, credentialScope, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
 	if opts.Debug == true {
 		fmt.Println("signature:")
 		fmt.Println(headerMap["Authorization"])
