@@ -1,14 +1,8 @@
 package main
 
 import (
-	"github.com/udryan10/hmacurl/canonicalRequest"
-	"github.com/udryan10/hmacurl/signString"
-	"github.com/udryan10/hmacurl/signature"
-	"github.com/udryan10/hmacurl/utilities"
-	"github.com/udryan10/hmacurl/validation"
 	"bytes"
 	"fmt"
-	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -16,6 +10,13 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/jessevdk/go-flags"
+	"github.com/udryan10/hmacurl/canonicalRequest"
+	"github.com/udryan10/hmacurl/signString"
+	"github.com/udryan10/hmacurl/signature"
+	"github.com/udryan10/hmacurl/utilities"
+	"github.com/udryan10/hmacurl/validation"
 )
 
 // positional argument
@@ -40,6 +41,8 @@ var opts struct {
 	SecretKey string `short:"s" long:"secret-key" default:"" description:"The secret Key to use in HMAC signing. Can also be specified as an environment variable(export HMACURL_SECRET_KEY='fasdf')"`
 
 	CredentialScope string `short:"c" long:"credential-scope" default:"" description:"The credential scope (aka Service Name) for the request. Defaults to short host name."`
+
+	Region string `short:"r" long:"region" default:"us-east-1" description:"The region to use in the credential scope. Default to us-east-1."`
 
 	SkipHost bool `short:"" long:"skip-host" default:"false" description:"Do not sign the Host header (useful for non-standard HMAC implementations)"`
 
@@ -97,7 +100,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	var payload string = ""
+	var payload string
 	if opts.Request == "POST" {
 		if opts.Data != "" {
 			payload = opts.Data
@@ -126,7 +129,7 @@ func main() {
 	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z")}
 
 	if opts.SkipHost == false {
-		headerMap["host"] = host
+		headerMap["host"] = urlString.Host
 	}
 
 	// add headers passed in from -H options to headerMap
@@ -152,15 +155,15 @@ func main() {
 		fmt.Println(canonicalStringHashed)
 		fmt.Println("================")
 	}
-	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, credentialScope)
+	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, opts.Region, credentialScope)
 	if opts.Debug == true {
 		fmt.Println("String to sign:")
 		fmt.Println(stringToSign)
 		fmt.Println("================")
 	}
 
-	signature := signature.CalculateSignature(requestTime, stringToSign, credentialScope, secretKey)
-	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, credentialScope, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
+	signature := signature.CalculateSignature(requestTime, stringToSign, opts.Region, credentialScope, secretKey)
+	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, opts.Region, credentialScope, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
 	if opts.Debug == true {
 		fmt.Println("signature:")
 		fmt.Println(headerMap["Authorization"])
@@ -176,9 +179,9 @@ func main() {
 			headerStringBuild += fmt.Sprintf(" %s '%s:%s'", "-H", k, v)
 		}
 		if opts.Request == "POST" {
-			fmt.Printf("curl -X%s %s %s -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
+			fmt.Printf("curl -X%s %s '%s' -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
 		} else if opts.Request == "GET" {
-			fmt.Printf("curl -X%s %s %s -v", opts.Request, headerStringBuild, urlString)
+			fmt.Printf("curl -X%s %s '%s' -v", opts.Request, headerStringBuild, urlString)
 		}
 		fmt.Println()
 		os.Exit(0)
