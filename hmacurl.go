@@ -46,6 +46,8 @@ var opts struct {
 
 	SkipHost bool `short:"" long:"skip-host" default:"false" description:"Do not sign the Host header (useful for non-standard HMAC implementations)"`
 
+	Proxy string `short:"p" long:"proxy" default:"" description:"Proxy server to use if not set via environment variable."`
+
 	Debug bool `long:"debug" default:"false" description:"Whether to output debug information"`
 
 	// remaining positional args
@@ -187,9 +189,20 @@ func main() {
 		os.Exit(0)
 	}
 
+	var client *http.Client
+	if len(opts.Proxy) > 0 {
+		proxyURL, err := url.Parse(opts.Proxy)
+		if err != nil {
+			fmt.Println("Error parsing proxy: " + err.Error())
+			os.Exit(1)
+		}
+		client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+	} else {
+		client = &http.Client{}
+	}
+
 	// make either a GET Request or POST Request
 	if opts.Request == "GET" {
-		client := &http.Client{}
 		req, err := http.NewRequest("GET", urlString.String(), nil)
 		// add headers to request
 		for k, v := range headerMap {
@@ -204,7 +217,6 @@ func main() {
 		body, err := ioutil.ReadAll(resp.Body)
 		fmt.Println(string(body[:]))
 	} else if opts.Request == "POST" {
-		client := &http.Client{}
 		req, err := http.NewRequest("POST", urlString.String(), bytes.NewBufferString(payload))
 		// add headers to request
 		for k, v := range headerMap {
