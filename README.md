@@ -46,6 +46,9 @@ Application Options:
                                                    Service Name) for the
                                                    request. Defaults to short
                                                    host name.
+  -r, --region=                                    The region string to use in
+                                                   the credential scope.
+                                                   Defaults to us-east-1.
       --skip-host                                  Do not sign the Host header
                                                    (useful for non-standard
                                                    HMAC implementations) (false)

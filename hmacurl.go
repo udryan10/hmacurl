@@ -42,7 +42,7 @@ var opts struct {
 
 	CredentialScope string `short:"c" long:"credential-scope" default:"" description:"The credential scope (aka Service Name) for the request. Defaults to short host name."`
 
-	Region string `short:"r" long:"region" default:"us-east-1" description:"The region to use in the credential scope. Default to us-east-1."`
+	Region string `short:"r" long:"region" default:"us-east-1" description:"The region to use in the credential scope."`
 
 	SkipHost bool `short:"" long:"skip-host" default:"false" description:"Do not sign the Host header (useful for non-standard HMAC implementations)"`
 
