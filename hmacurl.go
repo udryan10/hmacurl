@@ -1,14 +1,8 @@
 package main
 
 import (
-	"github.com/udryan10/hmacurl/canonicalRequest"
-	"github.com/udryan10/hmacurl/signString"
-	"github.com/udryan10/hmacurl/signature"
-	"github.com/udryan10/hmacurl/utilities"
-	"github.com/udryan10/hmacurl/validation"
 	"bytes"
 	"fmt"
-	"github.com/jessevdk/go-flags"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -16,6 +10,13 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/jessevdk/go-flags"
+	"github.com/udryan10/hmacurl/canonicalRequest"
+	"github.com/udryan10/hmacurl/signString"
+	"github.com/udryan10/hmacurl/signature"
+	"github.com/udryan10/hmacurl/utilities"
+	"github.com/udryan10/hmacurl/validation"
 )
 
 // positional argument
@@ -41,7 +42,11 @@ var opts struct {
 
 	CredentialScope string `short:"c" long:"credential-scope" default:"" description:"The credential scope (aka Service Name) for the request. Defaults to short host name."`
 
+	Region string `short:"r" long:"region" default:"us-east-1" description:"The region to use in the credential scope."`
+
 	SkipHost bool `short:"" long:"skip-host" default:"false" description:"Do not sign the Host header (useful for non-standard HMAC implementations)"`
+
+	Proxy string `short:"p" long:"proxy" default:"" description:"Proxy server to use if not set via environment variable."`
 
 	Debug bool `long:"debug" default:"false" description:"Whether to output debug information"`
 
@@ -97,7 +102,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	var payload string = ""
+	var payload string
 	if opts.Request == "POST" {
 		if opts.Data != "" {
 			payload = opts.Data
@@ -126,7 +131,7 @@ func main() {
 	headerMap := map[string]string{"x-amz-date": requestTime.Format("20060102T150405Z")}
 
 	if opts.SkipHost == false {
-		headerMap["host"] = host
+		headerMap["host"] = urlString.Host
 	}
 
 	// add headers passed in from -H options to headerMap
@@ -152,15 +157,15 @@ func main() {
 		fmt.Println(canonicalStringHashed)
 		fmt.Println("================")
 	}
-	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, credentialScope)
+	stringToSign := signString.StringToSign(requestTime, canonicalStringHashed, opts.Region, credentialScope)
 	if opts.Debug == true {
 		fmt.Println("String to sign:")
 		fmt.Println(stringToSign)
 		fmt.Println("================")
 	}
 
-	signature := signature.CalculateSignature(requestTime, stringToSign, credentialScope, secretKey)
-	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, credentialScope, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
+	signature := signature.CalculateSignature(requestTime, stringToSign, opts.Region, credentialScope, secretKey)
+	headerMap["Authorization"] = utilities.GenerateSignedHeader(accessKey, signature, opts.Region, credentialScope, requestTime.Format("20060102"), canonicalRequest.FormatSignedHeaders(headerMap))
 	if opts.Debug == true {
 		fmt.Println("signature:")
 		fmt.Println(headerMap["Authorization"])
@@ -176,17 +181,28 @@ func main() {
 			headerStringBuild += fmt.Sprintf(" %s '%s:%s'", "-H", k, v)
 		}
 		if opts.Request == "POST" {
-			fmt.Printf("curl -X%s %s %s -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
+			fmt.Printf("curl -X%s %s '%s' -v -d'%s'", opts.Request, headerStringBuild, urlString, payload)
 		} else if opts.Request == "GET" {
-			fmt.Printf("curl -X%s %s %s -v", opts.Request, headerStringBuild, urlString)
+			fmt.Printf("curl -X%s %s '%s' -v", opts.Request, headerStringBuild, urlString)
 		}
 		fmt.Println()
 		os.Exit(0)
 	}
 
+	var client *http.Client
+	if len(opts.Proxy) > 0 {
+		proxyURL, err := url.Parse(opts.Proxy)
+		if err != nil {
+			fmt.Println("Error parsing proxy: " + err.Error())
+			os.Exit(1)
+		}
+		client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+	} else {
+		client = &http.Client{}
+	}
+
 	// make either a GET Request or POST Request
 	if opts.Request == "GET" {
-		client := &http.Client{}
 		req, err := http.NewRequest("GET", urlString.String(), nil)
 		// add headers to request
 		for k, v := range headerMap {
@@ -201,7 +217,6 @@ func main() {
 		body, err := ioutil.ReadAll(resp.Body)
 		fmt.Println(string(body[:]))
 	} else if opts.Request == "POST" {
-		client := &http.Client{}
 		req, err := http.NewRequest("POST", urlString.String(), bytes.NewBufferString(payload))
 		// add headers to request
 		for k, v := range headerMap {
